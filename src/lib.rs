@@ -190,4 +190,32 @@ mod tests {
 
         assert_eq!(bloom_filter.insert(last_item), false);
     }
+
+    #[test]
+    fn test_calc_best_number_of_bits_valid() {
+        // This test is made considering article here https://freecontent.manning.com/all-about-bloom-filters/
+        // The article says that the number of bits divided by items count should be bigger 8 to support the false
+        // positive probability lowe 3%.
+
+        let expected_items_count: u32 = 233_092;
+        let expected_false_positive_probability: f32 = 0.01;
+
+        let calculated_best_number_of_bits: usize = BloomFilter::calc_best_number_of_bits(
+            expected_items_count,
+            expected_false_positive_probability,
+        );
+
+        assert!(calculated_best_number_of_bits > 0);
+        assert!(calculated_best_number_of_bits / expected_items_count as usize > 8);
+    }
+
+    #[test]
+    fn test_calc_best_number_of_hashes() {
+        let expected_false_positive_probability: f32 = 0.01;
+
+        let calculated_best_number_of_hashes: i8 =
+            BloomFilter::calc_best_number_of_hashes(expected_false_positive_probability);
+
+        assert!(calculated_best_number_of_hashes > 0);
+    }
 }
