@@ -2,6 +2,8 @@
 
 use std::hash::Hasher;
 
+use fasthash::city::Hasher64 as CityHasher64;
+use fasthash::murmur::Hasher32 as MurmurHasher32;
 use fasthash::{CityHasher, FastHasher, MurmurHasher};
 
 const DEFAULT_FALSE_POSITIVE_PROBABILITY: f32 = 0.4f32;
@@ -62,9 +64,8 @@ impl BloomFilter {
     pub fn insert(&mut self, item: &str) -> bool {
         if self.items_added < self.items_count {
             for i in 0..self.number_of_hashes {
-                // TODO: Refactor initialization should happen only onces
-                let mut murmur_hasher = MurmurHasher::new();
-                let mut city_hasher = CityHasher::new();
+                let mut murmur_hasher: MurmurHasher32 = MurmurHasher::new();
+                let mut city_hasher: CityHasher64 = CityHasher::new();
 
                 murmur_hasher.write(item.as_bytes());
                 city_hasher.write(item.as_bytes());
@@ -87,9 +88,8 @@ impl BloomFilter {
 
     pub fn is_probably_present(&self, item: &str) -> bool {
         for i in 0..self.number_of_hashes {
-            // TODO: Refactor initialization should happen only onces
-            let mut murmur_hasher = MurmurHasher::new();
-            let mut city_hasher = CityHasher::new();
+            let mut murmur_hasher: MurmurHasher32 = MurmurHasher::new();
+            let mut city_hasher: CityHasher64 = CityHasher::new();
 
             murmur_hasher.write(item.as_bytes());
             city_hasher.write(item.as_bytes());
