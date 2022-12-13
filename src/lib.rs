@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_variables)]
+
 use std::hash::Hasher;
 
 use fasthash::{CityHasher, FastHasher, MurmurHasher};
@@ -35,7 +37,8 @@ impl BloomFilter {
             false_positive_probability_opt.unwrap_or(DEFAULT_FALSE_POSITIVE_PROBABILITY);
         let number_of_bits: usize =
             Self::calc_best_number_of_bits(items_count, false_positive_probability);
-        let number_of_hashes: u8 = Self::calc_best_number_of_hashes(false_positive_probability) as u8;
+        let number_of_hashes: u8 =
+            Self::calc_best_number_of_hashes(false_positive_probability) as u8;
 
         Ok(Self {
             false_positive_probability: false_positive_probability,
