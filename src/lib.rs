@@ -1,6 +1,6 @@
 use std::hash::Hasher;
 
-use fasthash::{FastHasher, MurmurHasher};
+use fasthash::{CityHasher, FastHasher, MurmurHasher};
 
 const DEFAULT_FALSE_POSITIVE_RATE: f32 = 0.4f32;
 
@@ -50,10 +50,17 @@ impl BloomFilter {
     pub fn insert(&mut self, item: &str) -> bool {
         if self.items_added < self.number_of_elements {
             for i in 0..self.number_of_hash_functions {
-                let mut hasher = MurmurHasher::new();
+                // TODO: Refactor initialization should happen only onces
+                let mut murmur_hasher = MurmurHasher::new();
+                let mut city_hasher = CityHasher::new();
 
-                hasher.write(item.as_bytes());
-                let item_hash_index = (hasher.finish() % self.number_of_bits as u64) as usize;
+                murmur_hasher.write(item.as_bytes());
+                city_hasher.write(item.as_bytes());
+
+                // Solution is based on answer: https://stackoverflow.com/questions/24676237/generating-random-hash-functions-for-lsh-minhash-algorithm#answer-24685697
+                let aka_random_hash: u128 =
+                    murmur_hasher.finish() as u128 + (i as u128) * city_hasher.finish() as u128;
+                let item_hash_index = (aka_random_hash % self.number_of_bits as u128) as usize;
 
                 self.buffer[item_hash_index] = true;
             }
@@ -68,10 +75,17 @@ impl BloomFilter {
 
     pub fn is_probably_present(&self, item: &str) -> bool {
         for i in 0..self.number_of_hash_functions {
-            let mut hasher = MurmurHasher::new();
+            // TODO: Refactor initialization should happen only onces
+            let mut murmur_hasher = MurmurHasher::new();
+            let mut city_hasher = CityHasher::new();
 
-            hasher.write(item.as_bytes());
-            let item_hash_index = (hasher.finish() % self.number_of_bits as u64) as usize;
+            murmur_hasher.write(item.as_bytes());
+            city_hasher.write(item.as_bytes());
+
+            // Solution is based on answer: https://stackoverflow.com/questions/24676237/generating-random-hash-functions-for-lsh-minhash-algorithm#answer-24685697
+            let aka_random_hash: u128 =
+                murmur_hasher.finish() as u128 + (i as u128) * city_hasher.finish() as u128;
+            let item_hash_index = (aka_random_hash % self.number_of_bits as u128) as usize;
 
             if !self.buffer[item_hash_index] {
                 return false;
