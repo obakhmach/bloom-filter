@@ -215,4 +215,22 @@ mod tests {
 
         assert!(calculated_best_number_of_hashes > 0);
     }
+
+    #[test]
+    fn test_calc_random_bit_array_index() {
+        let test_item: &str = "Hello test world!";
+        let test_seed: u8 = 2;
+        let test_false_positive_probability: f32 = 0.01;
+        let test_items_count: u32 = 923578;
+
+        let mut bloom_filter: BloomFilter =
+            match BloomFilter::new(Some(test_false_positive_probability), test_items_count) {
+                Ok(bloom_filter) => bloom_filter,
+                Err(msg) => panic!("{}", msg),
+            };
+
+        for i in 0..9999 {
+            bloom_filter._calc_random_bit_array_index(test_item, test_seed);
+        }
+    }
 }
