@@ -34,8 +34,8 @@ impl BloomFilter {
         let false_positive_probability: f32 =
             false_positive_probability_opt.unwrap_or(DEFAULT_FALSE_POSITIVE_PROBABILITY);
         let number_of_bits: usize =
-            Self::best_number_of_bits(items_count, false_positive_probability);
-        let number_of_hashes: u8 = Self::best_number_of_hashes(false_positive_probability) as u8;
+            Self::calc_best_number_of_bits(items_count, false_positive_probability);
+        let number_of_hashes: u8 = Self::calc_best_number_of_hashes(false_positive_probability) as u8;
 
         Ok(Self {
             false_positive_probability: false_positive_probability,
@@ -47,12 +47,12 @@ impl BloomFilter {
         })
     }
 
-    pub fn best_number_of_bits(items_count: u32, false_positive_probability: f32) -> usize {
+    pub fn calc_best_number_of_bits(items_count: u32, false_positive_probability: f32) -> usize {
         -(items_count as f32 * false_positive_probability.ln() / f32::powf(f32::ln(2.0), 2.0))
             as usize
     }
 
-    pub fn best_number_of_hashes(false_positive_probability: f32) -> i8 {
+    pub fn calc_best_number_of_hashes(false_positive_probability: f32) -> i8 {
         -f32::log2(false_positive_probability) as i8
     }
 
