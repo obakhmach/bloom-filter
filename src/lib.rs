@@ -41,10 +41,10 @@ impl BloomFilter {
             Self::calc_best_number_of_hashes(false_positive_probability) as u8;
 
         Ok(Self {
-            false_positive_probability: false_positive_probability,
-            number_of_bits: number_of_bits,
-            items_count: items_count,
-            number_of_hashes: number_of_hashes,
+            false_positive_probability,
+            number_of_bits,
+            items_count,
+            number_of_hashes,
             buffer: vec![false; number_of_bits],
             items_added: 0,
         })
