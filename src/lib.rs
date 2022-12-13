@@ -61,19 +61,25 @@ impl BloomFilter {
         -f32::log2(false_positive_probability) as i8
     }
 
+    pub fn _calc_random_bit_array_index(&mut self, item: &str, seed: u8) -> usize {
+        let mut murmur_hasher: MurmurHasher32 = MurmurHasher::new();
+        let mut city_hasher: CityHasher64 = CityHasher::new();
+
+        murmur_hasher.write(item.as_bytes());
+        city_hasher.write(item.as_bytes());
+
+        // Solution is based on answer:
+        // https://stackoverflow.com/questions/24676237/generating-random-hash-functions-for-lsh-minhash-algorithm#answer-24685697
+        let aka_random_hash: u128 =
+            murmur_hasher.finish() as u128 + (seed as u128) * city_hasher.finish() as u128;
+
+        (aka_random_hash % self.number_of_bits as u128) as usize
+    }
+
     pub fn insert(&mut self, item: &str) -> bool {
         if self.items_added < self.items_count {
             for i in 0..self.number_of_hashes {
-                let mut murmur_hasher: MurmurHasher32 = MurmurHasher::new();
-                let mut city_hasher: CityHasher64 = CityHasher::new();
-
-                murmur_hasher.write(item.as_bytes());
-                city_hasher.write(item.as_bytes());
-
-                // Solution is based on answer: https://stackoverflow.com/questions/24676237/generating-random-hash-functions-for-lsh-minhash-algorithm#answer-24685697
-                let aka_random_hash: u128 =
-                    murmur_hasher.finish() as u128 + (i as u128) * city_hasher.finish() as u128;
-                let item_hash_index = (aka_random_hash % self.number_of_bits as u128) as usize;
+                let item_hash_index: usize = self._calc_random_bit_array_index(item, i);
 
                 self.buffer[item_hash_index] = true;
             }
@@ -86,18 +92,9 @@ impl BloomFilter {
         }
     }
 
-    pub fn is_probably_present(&self, item: &str) -> bool {
+    pub fn is_probably_present(&mut self, item: &str) -> bool {
         for i in 0..self.number_of_hashes {
-            let mut murmur_hasher: MurmurHasher32 = MurmurHasher::new();
-            let mut city_hasher: CityHasher64 = CityHasher::new();
-
-            murmur_hasher.write(item.as_bytes());
-            city_hasher.write(item.as_bytes());
-
-            // Solution is based on answer: https://stackoverflow.com/questions/24676237/generating-random-hash-functions-for-lsh-minhash-algorithm#answer-24685697
-            let aka_random_hash: u128 =
-                murmur_hasher.finish() as u128 + (i as u128) * city_hasher.finish() as u128;
-            let item_hash_index = (aka_random_hash % self.number_of_bits as u128) as usize;
+            let item_hash_index: usize = self._calc_random_bit_array_index(item, i);
 
             if !self.buffer[item_hash_index] {
                 return false;
