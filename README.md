@@ -16,7 +16,14 @@ For example for dev branch with version 0.1.1 the dependecy will look the follow
 ```yaml
 [dependencies]
 ...
-bfilters = { git = "https://github.com/alexanderbakhmach/bloom-filter", branch = "dev", version = "0.1.1"}
+bfilters = { git = "https://github.com/alexanderbakhmach/bloom-filter", branch = "dev", version = "0.1.3"}
+```
+
+Or as a registered create
+```yaml
+[dependencies]
+...
+bfilters = "0.1.3"
 ```
 
 ## Use
