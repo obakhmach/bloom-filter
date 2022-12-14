@@ -47,6 +47,33 @@ pub const DEFAULT_FALSE_POSITIVE_PROBABILITY: f32 = 0.4f32;
 ///
 /// assert!(!bloom_filter.is_probably_present(item_absent));
 /// ```
+/// 
+/// Also (if needed) all the parameters could be initialized.
+/// 
+/// ```rust
+/// use bfilters::BloomFilter;
+/// let test_item: &str = "Vinegar";
+/// let test_absent_item: &str = "Coke";
+/// let test_false_positive_probability: f32 = 0.01;
+/// let test_items_count: u32 = 923578;
+/// let test_capacity: u32 = 923578 * 10;
+/// let test_number_of_hashes: u32 = 4;
+///
+/// let mut bloom_filter: BloomFilter = match BloomFilter::custom(
+///     test_items_count,
+///     Some(test_false_positive_probability),
+///     Some(test_capacity),
+///     Some(test_number_of_hashes),
+/// ) {
+///     Ok(bloom_filter) => bloom_filter,
+///     Err(msg) => panic!("{}", msg),
+/// };
+///
+/// bloom_filter.insert(test_item);
+///
+/// let probably_present: bool = bloom_filter.is_probably_present(test_absent_item);
+///
+/// assert_eq!(probably_present, false);
 pub struct BloomFilter {
     false_positive_probability: f32,
     number_of_bits: u32,
@@ -66,21 +93,59 @@ impl BloomFilter {
             return Err("The bloom filter's items count could not be 0.".to_owned());
         }
 
-        if false_positive_probability_opt <= Some(0.0)
-            || false_positive_probability_opt >= Some(1.0)
-        {
+        let false_positive_probability: f32 =
+            false_positive_probability_opt.unwrap_or(DEFAULT_FALSE_POSITIVE_PROBABILITY);
+
+        if false_positive_probability <= 0.0 || false_positive_probability >= 1.0 {
             return Err(
                 "The bloom filter's false positive probability should be in range from 0 to 1."
                     .to_owned(),
             );
         }
 
-        let false_positive_probability: f32 =
-            false_positive_probability_opt.unwrap_or(DEFAULT_FALSE_POSITIVE_PROBABILITY);
         let number_of_bits: u32 =
             Self::calc_best_number_of_bits(items_count, false_positive_probability);
         let number_of_hashes: u32 =
             Self::calc_best_number_of_hashes(false_positive_probability) as u32;
+
+        Ok(Self {
+            false_positive_probability,
+            number_of_bits,
+            items_count,
+            number_of_hashes,
+            buffer: vec![false; number_of_bits as usize],
+            items_added: 0,
+        })
+    }
+    
+    /// Constructor that allowed to set all the parameters manually. The false_positive_probability,
+    /// number_of_bits_opt, number_of_hashes_opt will be computed only if None will be passed.
+    pub fn custom(
+        items_count: u32,
+        false_positive_probability_opt: Option<f32>,
+        number_of_bits_opt: Option<u32>,
+        number_of_hashes_opt: Option<u32>,
+    ) -> Result<Self, String> {
+        if items_count == 0 {
+            return Err("The bloom filter's items count could not be 0.".to_owned());
+        }
+
+        let false_positive_probability: f32 =
+            false_positive_probability_opt.unwrap_or(DEFAULT_FALSE_POSITIVE_PROBABILITY);
+
+        if false_positive_probability <= 0.0 || false_positive_probability >= 1.0 {
+            return Err(
+                "The bloom filter's false positive probability should be in range from 0 to 1."
+                    .to_owned(),
+            );
+        }
+
+        let number_of_bits: u32 = number_of_bits_opt.unwrap_or(Self::calc_best_number_of_bits(
+            items_count,
+            false_positive_probability,
+        ));
+        let number_of_hashes: u32 = number_of_hashes_opt
+            .unwrap_or(Self::calc_best_number_of_hashes(false_positive_probability) as u32);
 
         Ok(Self {
             false_positive_probability,
@@ -232,8 +297,26 @@ mod tests {
         let item: &str = "John Green";
         let wrong_item: &str = "John White";
         let items_capacity = 250_000_000; // 500 millions because the number of smart contracts in ethereum is 2,5 million
-                                               // we aim to test with 100 bigger number
+                                          // we aim to test with 100 bigger number
         let mut bloom_filter = match BloomFilter::new(Some(0.35), 2_000_0000) {
+            Ok(bloom_filter) => bloom_filter,
+            Err(msg) => panic!("{}", msg),
+        };
+
+        bloom_filter.insert(item);
+
+        let probably_present: bool = bloom_filter.is_probably_present(wrong_item);
+
+        assert_eq!(probably_present, false);
+    }
+
+    #[test]
+    fn test_item_not_present_empty() {
+        let item: &str = "John Green";
+        let wrong_item: &str = "John White";
+        let items_capacity = 250_000_000; // 500 millions because the number of smart contracts in ethereum is 2,5 million
+                                          // we aim to test with 100 bigger number
+        let mut bloom_filter = match BloomFilter::new(None, 2_000_0000) {
             Ok(bloom_filter) => bloom_filter,
             Err(msg) => panic!("{}", msg),
         };
@@ -352,5 +435,50 @@ mod tests {
         for i in 0..9999 {
             bloom_filter._calc_random_bit_array_index(test_item, test_seed);
         }
+    }
+
+    #[test]
+    fn test_with_custom_parameters() {
+        let test_item: &str = "Hello test world!";
+        let test_absent_item: &str = "Absent";
+        let test_false_positive_probability: f32 = 0.01;
+        let test_items_count: u32 = 923578;
+        let test_capacity: u32 = 923578 * 10;
+        let test_number_of_hashes: u32 = 4;
+
+        let mut bloom_filter: BloomFilter = match BloomFilter::custom(
+            test_items_count,
+            Some(test_false_positive_probability),
+            Some(test_capacity),
+            Some(test_number_of_hashes),
+        ) {
+            Ok(bloom_filter) => bloom_filter,
+            Err(msg) => panic!("{}", msg),
+        };
+
+        bloom_filter.insert(test_item);
+
+        let probably_present: bool = bloom_filter.is_probably_present(test_absent_item);
+
+        assert_eq!(probably_present, false);
+    }
+
+    #[test]
+    fn test_with_custom_parameters_optional_empty() {
+        let test_item: &str = "Hello test world!";
+        let test_absent_item: &str = "Absent";
+        let test_items_count: u32 = 923578;
+
+        let mut bloom_filter: BloomFilter =
+            match BloomFilter::custom(test_items_count, None, None, None) {
+                Ok(bloom_filter) => bloom_filter,
+                Err(msg) => panic!("{}", msg),
+            };
+
+        bloom_filter.insert(test_item);
+
+        let probably_present: bool = bloom_filter.is_probably_present(test_absent_item);
+
+        assert_eq!(probably_present, false);
     }
 }
