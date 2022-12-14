@@ -232,7 +232,7 @@ mod tests {
         let item: &str = "John Green";
         let wrong_item: &str = "John White";
         let items_capacity = 250_000_000; // 500 millions because the number of smart contracts in ethereum is 2,5 million
-                                               // we aim to test with 100 bigger number
+                                          // we aim to test with 100 bigger number
         let mut bloom_filter = match BloomFilter::new(Some(0.35), 2_000_0000) {
             Ok(bloom_filter) => bloom_filter,
             Err(msg) => panic!("{}", msg),
