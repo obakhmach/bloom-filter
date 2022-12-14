@@ -13,7 +13,7 @@ pub const DEFAULT_FALSE_POSITIVE_PROBABILITY: f32 = 0.4f32;
 /// Consider the fact that constructor returns Result<BloomFilter, String>
 ///
 /// ```rust
-/// use bloom_filters_rust::BloomFilter;
+/// use bfilters::BloomFilter;
 /// let expected_items_count: u32 = 233_092;
 /// let expected_false_positive_probability: f32 = 0.01;
 ///
@@ -30,7 +30,7 @@ pub const DEFAULT_FALSE_POSITIVE_PROBABILITY: f32 = 0.4f32;
 /// In the example below we check whether the Coke was memorized with a bloom filter or not.
 ///
 /// ```rust
-/// use bloom_filters_rust::BloomFilter;
+/// use bfilters::BloomFilter;
 ///
 /// let expected_items_count: u32 = 233_999;
 /// let expected_false_positive_probability: f32 = 0.01;
@@ -231,7 +231,9 @@ mod tests {
     fn test_item_not_present() {
         let item: &str = "John Green";
         let wrong_item: &str = "John White";
-        let mut bloom_filter = match BloomFilter::new(Some(0.35), 100) {
+        let items_capacity = 250_000_000; // 500 millions because the number of smart contracts in ethereum is 2,5 million
+                                               // we aim to test with 100 bigger number
+        let mut bloom_filter = match BloomFilter::new(Some(0.35), 2_000_0000) {
             Ok(bloom_filter) => bloom_filter,
             Err(msg) => panic!("{}", msg),
         };
