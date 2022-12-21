@@ -1,10 +1,15 @@
 #![allow(dead_code, unused_variables)]
 
+use std::fs::File;
 use std::hash::Hasher;
+use std::io::{Read, Result as IoResult, Write};
+use std::path::Path;
 
 use fasthash::city::Hasher64 as CityHasher64;
 use fasthash::murmur::Hasher32 as MurmurHasher32;
 use fasthash::{CityHasher, FastHasher, MurmurHasher};
+
+use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_FALSE_POSITIVE_PROBABILITY: f32 = 0.4f32;
 
@@ -47,9 +52,9 @@ pub const DEFAULT_FALSE_POSITIVE_PROBABILITY: f32 = 0.4f32;
 ///
 /// assert!(!bloom_filter.is_probably_present(item_absent));
 /// ```
-/// 
+///
 /// Also (if needed) all the parameters could be initialized.
-/// 
+///
 /// ```rust
 /// use bfilters::BloomFilter;
 /// let test_item: &str = "Vinegar";
@@ -74,6 +79,7 @@ pub const DEFAULT_FALSE_POSITIVE_PROBABILITY: f32 = 0.4f32;
 /// let probably_present: bool = bloom_filter.is_probably_present(test_absent_item);
 ///
 /// assert_eq!(probably_present, false);
+#[derive(Serialize, Deserialize)]
 pub struct BloomFilter {
     false_positive_probability: f32,
     number_of_bits: u32,
@@ -117,7 +123,7 @@ impl BloomFilter {
             items_added: 0,
         })
     }
-    
+
     /// Constructor that allowed to set all the parameters manually. The false_positive_probability,
     /// number_of_bits_opt, number_of_hashes_opt will be computed only if None will be passed.
     pub fn custom(
@@ -155,6 +161,16 @@ impl BloomFilter {
             buffer: vec![false; number_of_bits as usize],
             items_added: 0,
         })
+    }
+
+    /// Tries to instantiate a new instance of the bloom filter from the given file.
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
+        let mut _file = File::open(path).unwrap();
+        let mut _buffer: String = String::new();
+
+        _file.read_to_string(&mut _buffer).unwrap();
+
+        Ok(serde_json::from_str::<Self>(&_buffer).unwrap())
     }
 
     /// Calculates the best number of bits for the bloom filter's bit array.
@@ -225,7 +241,7 @@ impl BloomFilter {
         }
     }
 
-    /// Given the negative or false positive answer about the item presence in the bloom fiter.
+    /// Given the negative or false positive answer about the item presence in the bloom filter.
     pub fn is_probably_present(&mut self, item: &str) -> bool {
         for i in 0..self.number_of_hashes {
             let item_hash_index: usize = self._calc_random_bit_array_index(item, i);
@@ -238,54 +254,17 @@ impl BloomFilter {
         true
     }
 
-    // ************************************************
-    // THE CODE SNIPPETS FOR LATER IMPLEMENTATION
-    // ************************************************
-    // pub fn _buffer_as_bytes(buffer: &Vec<bool>) -> Vec<u8> {
-    //     let mut _buffer_bytes: Vec<u8> = Vec::<u8>::new();
+    /// With given path to a file saves a state of the current bloom filter in order
+    /// to be able to deserialize it later.
+    /// Returns an empty std::io::Result as IoResult
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> IoResult<()> {
+        let mut _file = File::create(path)?;
 
-    //     for (idx, bool_bit) in buffer.iter().enumerate() {
-    //         let byte_position = idx / 8;
-    //         let shift = 7 - idx % 8;
+        let _serialized_bfilter: String = serde_json::to_string(self)?;
+        _file.write_all(_serialized_bfilter.as_str().as_bytes())?;
 
-    //         _buffer_bytes[byte_position] |= (*bool_bit as u8) << (idx % 8);
-    //     }
-
-    //     _buffer_bytes
-    // }
-
-    // pub fn to_bytes(&self) -> Vec<u8> {
-    //     let _items_count_bytes = self.items_count.to_ne_bytes();
-    //     let _number_of_hashes_bytes = self.number_of_hashes.to_ne_bytes();
-    //     let _number_of_bits_bytes = self.number_of_bits.to_ne_bytes();
-    //     let _items_added_bytes = self.items_added.to_ne_bytes();
-    //     let _false_positive_probability_bytes = self.false_positive_probability.to_ne_bytes();
-
-    //     let mut state_bytes = [
-    //         _items_count_bytes,
-    //         _items_added_bytes,
-    //         _false_positive_probability_bytes,
-    //         _number_of_bits_bytes,
-    //         _number_of_hashes_bytes,
-    //     ]
-    //     .concat();
-
-    //     state_bytes.append(&mut Self::_buffer_as_bytes(&self.buffer));
-
-    //     state_bytes
-    // }
-
-    // pub fn save_to_file(&self, filepath: &str) -> Result<(), String> {
-    //     if !Path::new(filepath).exists() {
-    //         match fs::write(filepath, self.to_bytes()) {
-    //             Ok(_) => Ok(()),
-    //             Err(msg) => Err("Can not open the file.".to_owned()),
-    //         }
-    //     } else {
-    //         Err("File already exists.".to_owned())
-    //     }
-    // }
-    // ************************************************
+        Ok(())
+    }
 }
 
 #[cfg(test)]
