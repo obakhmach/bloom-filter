@@ -2,7 +2,7 @@
 
 use std::fs::File;
 use std::hash::Hasher;
-use std::io::{Read, Result as IoResult, Write};
+use std::io::{self, Read, Write};
 use std::path::Path;
 
 use fasthash::city::Hasher64 as CityHasher64;
@@ -12,6 +12,46 @@ use fasthash::{CityHasher, FastHasher, MurmurHasher};
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_FALSE_POSITIVE_PROBABILITY: f32 = 0.4f32;
+
+/// The error that can be returned on bloom_filter.save either
+/// if something was wrong with the file or with parsing.
+#[derive(Debug)]
+pub enum SaveBloomFilterError {
+    Io(io::Error),
+    Serialize(serde_json::Error),
+}
+
+impl From<io::Error> for SaveBloomFilterError {
+    fn from(err: io::Error) -> Self {
+        return SaveBloomFilterError::Io(err);
+    }
+}
+
+impl From<serde_json::Error> for SaveBloomFilterError {
+    fn from(err: serde_json::Error) -> Self {
+        return SaveBloomFilterError::Serialize(err);
+    }
+}
+
+/// The error that can be returned on BloomFilter::from_file either
+/// if something was wrong with the file or with parsing.
+#[derive(Debug)]
+pub enum LoadBloomFilterError {
+    Io(io::Error),
+    Serialize(serde_json::Error),
+}
+
+impl From<io::Error> for LoadBloomFilterError {
+    fn from(err: io::Error) -> Self {
+        return LoadBloomFilterError::Io(err);
+    }
+}
+
+impl From<serde_json::Error> for LoadBloomFilterError {
+    fn from(err: serde_json::Error) -> Self {
+        return LoadBloomFilterError::Serialize(err);
+    }
+}
 
 /// A structure representing a bloom filter.
 /// The structure should be created \w ::new syntax.
@@ -79,6 +119,61 @@ pub const DEFAULT_FALSE_POSITIVE_PROBABILITY: f32 = 0.4f32;
 /// let probably_present: bool = bloom_filter.is_probably_present(test_absent_item);
 ///
 /// assert_eq!(probably_present, false);
+/// ```
+///
+/// Bloom filter could be both serialized and deserialized with the Serde lib.
+/// In order to load (deserialized) bloom filter from the . json file the BloomFilter::from_file constructor should be used.
+/// In order to save (serialize) bloom filter into fhe file as a JSON the bloom_filter.save(...) should be used.
+///
+/// ```rust
+/// use std::{fs, path::Path};
+/// use bfilters::BloomFilter;
+///
+/// // Define the bloom filter state
+/// let test_false_positive_probability: f32 = 0.01;
+/// let test_items_count: u32 = 923578;
+/// let test_capacity: u32 = 923578 * 10;
+/// let test_number_of_hashes: u32 = 4;
+///
+/// // Define the bloom filter test items
+/// let test_item: &str = "Vinegar";
+/// let test_absent_item: &str = "Coke";
+///
+/// // Instantiate a bloom filter
+/// let mut bloom_filter: BloomFilter = match BloomFilter::custom(
+///     test_items_count,
+///     Some(test_false_positive_probability),
+///     Some(test_capacity),
+///     Some(test_number_of_hashes),
+/// ) {
+///     Ok(bloom_filter) => bloom_filter,
+///     Err(msg) => panic!("{}", msg),
+/// };
+///
+/// // Validate that the bloom filter is working
+/// bloom_filter.insert(test_item);
+///
+/// let probably_present: bool = bloom_filter.is_probably_present(test_absent_item);
+///
+/// assert_eq!(probably_present, false);
+///
+/// // Serializing bloom filter into test tmp file
+/// let tmp_save_path: &Path = std::path::Path::new("./bfilter_tmp.json");
+///
+/// bloom_filter.save(tmp_save_path).unwrap();
+///
+/// // Initialize a new bloom filter from the file
+/// let mut deserialized_bloom_filter: BloomFilter = BloomFilter::from_file(tmp_save_path).unwrap();
+///
+/// // Validating that the deserialized bloom filter is working as before
+/// let probably_present: bool = deserialized_bloom_filter.is_probably_present(test_absent_item);
+///
+/// assert_eq!(probably_present, false);
+///
+/// // Delete a tmp file and verify that file has been deleted.
+/// fs::remove_file(tmp_save_path).unwrap();
+/// assert!(!tmp_save_path.exists());
+/// ```
 #[derive(Serialize, Deserialize)]
 pub struct BloomFilter {
     false_positive_probability: f32,
@@ -164,13 +259,15 @@ impl BloomFilter {
     }
 
     /// Tries to instantiate a new instance of the bloom filter from the given file.
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let mut _file = File::open(path).unwrap();
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, LoadBloomFilterError> {
+        let mut _file = File::open(path)?;
         let mut _buffer: String = String::new();
 
-        _file.read_to_string(&mut _buffer).unwrap();
+        _file.read_to_string(&mut _buffer)?;
 
-        Ok(serde_json::from_str::<Self>(&_buffer).unwrap())
+        let bloom_filter: Self = serde_json::from_str::<Self>(&_buffer)?;
+
+        Ok(bloom_filter)
     }
 
     /// Calculates the best number of bits for the bloom filter's bit array.
@@ -257,7 +354,7 @@ impl BloomFilter {
     /// With given path to a file saves a state of the current bloom filter in order
     /// to be able to deserialize it later.
     /// Returns an empty std::io::Result as IoResult
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> IoResult<()> {
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), SaveBloomFilterError> {
         let mut _file = File::create(path)?;
 
         let _serialized_bfilter: String = serde_json::to_string(self)?;
@@ -269,6 +366,10 @@ impl BloomFilter {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs, path::Path};
+
+    use crate::SaveBloomFilterError;
+
     use super::BloomFilter;
 
     #[test]
@@ -285,6 +386,97 @@ mod tests {
         bloom_filter.insert(item);
 
         let probably_present: bool = bloom_filter.is_probably_present(wrong_item);
+
+        assert_eq!(probably_present, false);
+    }
+
+    #[test]
+    fn test_serialize() {
+        let item: &str = "John Green";
+        let wrong_item: &str = "John White";
+        let items_capacity = 250_000_000; // 500 millions because the number of smart contracts in ethereum is 2,5 million
+                                          // we aim to test with 100 bigger number
+        let mut bloom_filter = match BloomFilter::new(Some(0.35), 2_000_0000) {
+            Ok(bloom_filter) => bloom_filter,
+            Err(msg) => panic!("{}", msg),
+        };
+
+        bloom_filter.insert(item);
+
+        let tmp_save_path_ser: &Path = std::path::Path::new("./bfilter_ser.json");
+
+        let success: bool = match bloom_filter.save(tmp_save_path_ser) {
+            Ok(_) => true,
+            Err(_) => false,
+        };
+
+        assert!(success);
+        assert!(tmp_save_path_ser.exists());
+
+        fs::remove_file(tmp_save_path_ser).unwrap();
+
+        assert!(!tmp_save_path_ser.exists());
+    }
+
+    #[test]
+    fn test_serialize_invalid_path() {
+        let item: &str = "John Green";
+        let wrong_item: &str = "John White";
+        let items_capacity = 250_000_000; // 500 millions because the number of smart contracts in ethereum is 2,5 million
+                                          // we aim to test with 100 bigger number
+        let mut bloom_filter = match BloomFilter::new(Some(0.35), 2_000_0000) {
+            Ok(bloom_filter) => bloom_filter,
+            Err(msg) => panic!("{}", msg),
+        };
+
+        bloom_filter.insert(item);
+
+        let tmp_save_path_ser: &Path = std::path::Path::new(".test/bfilter_ser.json");
+
+        let io_error_received: bool = match bloom_filter.save(tmp_save_path_ser) {
+            Ok(_) => false,
+            Err(SaveBloomFilterError::Io(err)) => true,
+            Err(SaveBloomFilterError::Serialize(err)) => false,
+        };
+
+        assert!(io_error_received);
+    }
+
+    #[test]
+    fn test_serialize_deserialize() {
+        let item: &str = "John Green";
+        let wrong_item: &str = "John White";
+        let items_capacity = 250_000_000; // 500 millions because the number of smart contracts in ethereum is 2,5 million
+                                          // we aim to test with 100 bigger number
+        let mut bloom_filter = match BloomFilter::new(Some(0.35), 2_000_0000) {
+            Ok(bloom_filter) => bloom_filter,
+            Err(msg) => panic!("{}", msg),
+        };
+
+        bloom_filter.insert(item);
+
+        let probably_present: bool = bloom_filter.is_probably_present(wrong_item);
+
+        assert_eq!(probably_present, false);
+
+        let tmp_save_path_ser_deser: &Path = std::path::Path::new("./bfilter_ser_deser.json");
+
+        let success: bool = match bloom_filter.save(tmp_save_path_ser_deser) {
+            Ok(_) => true,
+            Err(_) => false,
+        };
+
+        assert!(success);
+        assert!(tmp_save_path_ser_deser.exists());
+
+        let mut loaded_bloom_filter: BloomFilter =
+            BloomFilter::from_file(tmp_save_path_ser_deser).unwrap();
+
+        fs::remove_file(tmp_save_path_ser_deser).unwrap();
+
+        assert!(!tmp_save_path_ser_deser.exists());
+
+        let probably_present: bool = loaded_bloom_filter.is_probably_present(wrong_item);
 
         assert_eq!(probably_present, false);
     }
