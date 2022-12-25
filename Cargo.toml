@@ -1,6 +1,6 @@
 [package]
 name = "bfilters"
-version = "0.1.4"
+version = "0.2.0"
 edition = "2021"
 description = "Simple bloom filter implementation in Rust."
 license-file = "LICENSE"
@@ -10,3 +10,4 @@ repository = "https://github.com/alexanderbakhmach/bloom-filter"
 fasthash = "0.4.0"
 serde = {version = "1.0.151", features = ["derive"]}
 serde_json = "1.0.40" 
+bitarray-naive = {git = "https://github.com/obakhmach/bitarray", branch = "feature/serde-support"}
