@@ -11,6 +11,8 @@ use fasthash::{CityHasher, FastHasher, MurmurHasher};
 
 use serde::{Deserialize, Serialize};
 
+use bitarray_naive::BitArray;
+
 pub const DEFAULT_FALSE_POSITIVE_PROBABILITY: f32 = 0.4f32;
 
 /// The error that can be returned on bloom_filter.save either
@@ -180,7 +182,7 @@ pub struct BloomFilter {
     number_of_bits: u32,
     items_count: u32,
     number_of_hashes: u32,
-    buffer: Vec<bool>,
+    bit_array: BitArray,
     items_added: u32,
 }
 
@@ -214,7 +216,7 @@ impl BloomFilter {
             number_of_bits,
             items_count,
             number_of_hashes,
-            buffer: vec![false; number_of_bits as usize],
+            bit_array: BitArray::new(number_of_bits as i64),
             items_added: 0,
         })
     }
@@ -253,7 +255,7 @@ impl BloomFilter {
             number_of_bits,
             items_count,
             number_of_hashes,
-            buffer: vec![false; number_of_bits as usize],
+            bit_array: BitArray::new(number_of_bits as i64),
             items_added: 0,
         })
     }
@@ -327,7 +329,7 @@ impl BloomFilter {
             for i in 0..self.number_of_hashes {
                 let item_hash_index: usize = self._calc_random_bit_array_index(item, i);
 
-                self.buffer[item_hash_index] = true;
+                self.bit_array.set(item_hash_index as i64, true).unwrap();
             }
 
             self.items_added += 1;
@@ -343,7 +345,7 @@ impl BloomFilter {
         for i in 0..self.number_of_hashes {
             let item_hash_index: usize = self._calc_random_bit_array_index(item, i);
 
-            if !self.buffer[item_hash_index] {
+            if !self.bit_array.get(item_hash_index as i64).unwrap() {
                 return false;
             }
         }
