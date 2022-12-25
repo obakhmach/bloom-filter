@@ -10,4 +10,4 @@ repository = "https://github.com/alexanderbakhmach/bloom-filter"
 fasthash = "0.4.0"
 serde = {version = "1.0.151", features = ["derive"]}
 serde_json = "1.0.40" 
-bitarray-naive = {git = "https://github.com/obakhmach/bitarray", branch = "feature/serde-support"}
+bitarray-naive = "0.1.1"
